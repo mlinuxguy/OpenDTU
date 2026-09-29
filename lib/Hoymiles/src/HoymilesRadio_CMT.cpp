@@ -4,7 +4,6 @@
  */
 #include "HoymilesRadio_CMT.h"
 #include "Hoymiles.h"
-#include "Utils.h"
 #include "crc.h"
 #include <FunctionalInterrupt.h>
 #include <frozen/map.h>
@@ -216,14 +215,9 @@ void HoymilesRadio_CMT::loop()
                         | (static_cast<uint64_t>(f.fragment[7]) << 8)
                         | (static_cast<uint64_t>(f.fragment[8]));
                 }
+                ESP_LOGI(TAG, "CAPTURE %.2f MHz | %" PRId8 " dBm | len=%u", getFrequencyFromChannel(f.channel) / 1000000.0, f.rssi, f.len);
+                ESP_LOG_BUFFER_HEX_LEVEL(TAG, f.fragment, f.len, ESP_LOG_INFO);
 
-                ESP_LOGI(TAG, "CAPTURE %.2f MHz | %" PRId8 " dBm | src=%08" PRIx64 " dst=%08" PRIx64 " len=%u | %s",
-                    getFrequencyFromChannel(f.channel) / 1000000.0,
-                    f.rssi,
-                    srcSerial,
-                    dstSerial,
-                    f.len,
-                    Utils::dumpArray(f.fragment, f.len).c_str());
             }
             // --- End Capture Mode ---
 
@@ -237,8 +231,8 @@ void HoymilesRadio_CMT::loop()
 
                 if (nullptr != inv) {
                     // Save packet in inverter rx buffer
-                    ESP_LOGD(TAG, "RX %.2f MHz --> %s | %" PRId8 " dBm",
-                        getFrequencyFromChannel(f.channel) / 1000000.0, Utils::dumpArray(f.fragment, f.len).c_str(), f.rssi);
+                    ESP_LOGD(TAG, "RX %.2f MHz | %" PRId8 " dBm", getFrequencyFromChannel(f.channel) / 1000000.0, f.rssi);
+                    ESP_LOG_BUFFER_HEX_LEVEL(TAG, f.fragment, f.len, ESP_LOG_DEBUG);
 
                     inv->addRxFragment(f.fragment, f.len, f.rssi);
                 } else {
@@ -251,11 +245,10 @@ void HoymilesRadio_CMT::loop()
             } else if (_captureMode) {
                 ESP_LOGI(TAG, "CAPTURE: Frame not addressed to this DTU (foreign traffic)");
             }
-
         } else {
             if (_captureMode) {
-                ESP_LOGW(TAG, "CAPTURE: CRC failed | len=%u | %s",
-                    f.len, Utils::dumpArray(f.fragment, f.len).c_str());
+                ESP_LOGW(TAG, "CAPTURE: CRC failed | len=%u", f.len);
+                ESP_LOG_BUFFER_HEX_LEVEL(TAG, f.fragment, f.len, ESP_LOG_WARN);
             } else {
                 ESP_LOGW(TAG, "Frame kaputt"); // ;-)
             }
