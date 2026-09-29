@@ -26,7 +26,7 @@
                         :data-bs-target="'#v-pills-' + inverter.serial"
                         type="button"
                         role="tab"
-                        aria-controls="'v-pills-' + inverter.serial"
+                        :aria-controls="'v-pills-' + inverter.serial"
                         aria-selected="true"
                     >
                         <div class="d-flex align-items-center">
@@ -344,15 +344,33 @@
         </div>
     </BasePage>
 
-    <ModalDialog modalId="eventView" :title="$t('home.EventLog')" :loading="eventLogLoading">
+    <ModalDialog
+        modalId="eventView"
+        :title="$t('home.EventLog')"
+        :loading="eventLogLoading"
+        :show-reload="true"
+        @reload="onShowEventlog(eventLogSerial)"
+    >
         <EventLog :eventLogList="eventLogList" />
     </ModalDialog>
 
-    <ModalDialog modalId="devInfoView" :title="$t('home.InverterInfo')" :loading="devInfoLoading">
+    <ModalDialog
+        modalId="devInfoView"
+        :title="$t('home.InverterInfo')"
+        :loading="devInfoLoading"
+        :show-reload="true"
+        @reload="onShowDevInfo(devInfoList.serial)"
+    >
         <DevInfo :devInfoList="devInfoList" />
     </ModalDialog>
 
-    <ModalDialog modalId="gridProfileView" :title="$t('home.GridProfile')" :loading="gridProfileLoading">
+    <ModalDialog
+        modalId="gridProfileView"
+        :title="$t('home.GridProfile')"
+        :loading="gridProfileLoading"
+        :show-reload="true"
+        @reload="onShowGridProfile(gridProfileSerial)"
+    >
         <GridProfile :gridProfileList="gridProfileList" :gridProfileRawList="gridProfileRawList" />
     </ModalDialog>
 
@@ -531,6 +549,7 @@ import {
     BIconToggleOn,
 } from 'bootstrap-icons-vue';
 import { defineComponent } from 'vue';
+import WebSocketService from '@/utils/websocketService';
 
 export default defineComponent({
     components: {
@@ -559,19 +578,21 @@ export default defineComponent({
         return {
             isLogged: isLoggedIn(),
 
-            socket: {} as WebSocket,
+            socket: {} as WebSocketService,
             heartInterval: 0,
             dataAgeTimers: {} as Record<string, number>,
             dataLoading: true,
             liveData: {} as LiveData,
             isFirstFetchAfterConnect: true,
             eventLogView: {} as bootstrap.Modal,
+            eventLogSerial: '',
             eventLogList: {} as EventlogItems,
             eventLogLoading: true,
             devInfoView: {} as bootstrap.Modal,
             devInfoList: {} as DevInfoStatus,
             devInfoLoading: true,
             gridProfileView: {} as bootstrap.Modal,
+            gridProfileSerial: '',
             gridProfileList: {} as GridProfileStatus,
             gridProfileRawList: {} as GridProfileRawdata,
             gridProfileLoading: true,
@@ -621,7 +642,7 @@ export default defineComponent({
         this.powerSettingView = new bootstrap.Modal('#powerSettingView');
     },
     unmounted() {
-        this.closeSocket();
+        this.socket?.close();
     },
     updated() {
         console.log('Updated');
@@ -676,12 +697,32 @@ export default defineComponent({
                 });
         },
         reloadData() {
-            this.closeSocket();
+            this.socket?.close();
 
-            setTimeout(() => {
-                this.getInitialData(false);
+            this.getInitialData(false);
+            this.initSocket();
+        },
+        handleMessage(event: MessageEvent) {
+            if (!event.data || event.data === '{}') {
+                this.socket?.close(); // force reconnect
                 this.initSocket();
-            }, 1000);
+                return;
+            }
+
+            const newData = JSON.parse(event.data);
+
+            Object.assign(this.liveData.total, newData.total);
+            Object.assign(this.liveData.hints, newData.hints);
+
+            const idx = this.liveData.inverters.findIndex((i) => i.serial === newData.inverters[0].serial);
+
+            if (idx == -1) {
+                Object.assign(this.liveData.inverters, newData.inverters);
+                this.liveData.inverters.forEach((inv) => this.resetDataAging(inv));
+            } else if (this.liveData.inverters[idx]) {
+                Object.assign(this.liveData.inverters[idx], newData.inverters[0]);
+                this.resetDataAging(this.liveData.inverters[idx]);
+            }
         },
         initSocket() {
             console.log('Starting connection to WebSocket Server');
@@ -690,49 +731,24 @@ export default defineComponent({
             const authString = authUrl();
             const webSocketUrl = `${protocol === 'https:' ? 'wss' : 'ws'}://${authString}${host}/livedata`;
 
-            this.socket = new WebSocket(webSocketUrl);
-
-            this.socket.onmessage = (event) => {
-                console.log(event);
-                if (event.data != '{}') {
-                    const newData = JSON.parse(event.data);
-                    Object.assign(this.liveData.total, newData.total);
-                    Object.assign(this.liveData.hints, newData.hints);
-
-                    const foundIdx = this.liveData.inverters.findIndex(
-                        (element) => element.serial == newData.inverters[0].serial
-                    );
-                    if (foundIdx == -1) {
-                        Object.assign(this.liveData.inverters, newData.inverters);
-                        this.liveData.inverters.forEach((inv) => this.resetDataAging(inv));
-                    } else if (this.liveData.inverters[foundIdx]) {
-                        Object.assign(this.liveData.inverters[foundIdx], newData.inverters[0]);
-                        this.resetDataAging(this.liveData.inverters[foundIdx]);
-                    }
-                    this.dataLoading = false;
-                    this.heartCheck(); // Reset heartbeat detection
-                } else {
-                    // Sometimes it does not recover automatically so have to force a reconnect
-                    this.closeSocket();
-                    this.heartCheck(10); // Reconnect faster
-                }
-            };
-
-            this.socket.onopen = (event) => {
-                console.log(event);
-                console.log('Successfully connected to the echo websocket server...');
-                this.isWebsocketConnected = true;
-            };
-
-            this.socket.onclose = () => {
-                console.log('Connection to websocket closed...');
-                this.isWebsocketConnected = false;
-            };
+            this.socket = new WebSocketService(webSocketUrl, {
+                onMessage: this.handleMessage,
+                onOpen: () => {
+                    console.log('WebSocket connected');
+                    this.isWebsocketConnected = true;
+                },
+                onClose: () => {
+                    console.log('WebSocket closed');
+                    this.isWebsocketConnected = false;
+                },
+            });
 
             // Listen to window events , When the window closes , Take the initiative to disconnect websocket Connect
             window.onbeforeunload = () => {
-                this.closeSocket();
+                this.socket?.close();
             };
+
+            this.socket?.connect();
         },
         resetDataAging(inv: Inverter) {
             if (this.dataAgeTimers[inv.serial] !== undefined) {
@@ -756,30 +772,9 @@ export default defineComponent({
                 this.doDataAging(serial);
             }, 1000);
         },
-        // Send heartbeat packets regularly * 59s Send a heartbeat
-        heartCheck(duration: number = 59) {
-            if (this.heartInterval) {
-                clearTimeout(this.heartInterval);
-            }
-            this.heartInterval = setInterval(() => {
-                if (this.socket.readyState === 1) {
-                    // Connection status
-                    this.socket.send('ping');
-                } else {
-                    this.initSocket(); // Breakpoint reconnection 5 Time
-                }
-            }, duration * 1000);
-        },
-        /** To break off websocket Connect */
-        closeSocket() {
-            this.socket.close();
-            if (this.heartInterval) {
-                clearTimeout(this.heartInterval);
-            }
-            this.isFirstFetchAfterConnect = true;
-        },
         onShowEventlog(serial: string) {
             this.eventLogLoading = true;
+            this.eventLogSerial = serial;
             fetch('/api/eventlog/status?inv=' + serial + '&locale=' + this.$i18n.locale, {
                 headers: authHeader(),
             })
@@ -804,6 +799,7 @@ export default defineComponent({
             this.devInfoView.show();
         },
         onShowGridProfile(serial: string) {
+            this.gridProfileSerial = serial;
             this.gridProfileLoading = true;
             fetch('/api/gridprofile/status?inv=' + serial, { headers: authHeader() })
                 .then((response) => handleResponse(response, this.$emitter, this.$router))
@@ -908,18 +904,15 @@ export default defineComponent({
         },
 
         onSetPowerSettings(turnOn: boolean, restart = false) {
-            let data = {};
-            if (restart) {
-                data = {
-                    serial: this.powerSettingSerial,
-                    restart: true,
-                };
-            } else {
-                data = {
-                    serial: this.powerSettingSerial,
-                    power: turnOn,
-                };
-            }
+            const data = restart
+                ? {
+                      serial: this.powerSettingSerial,
+                      restart: true,
+                  }
+                : {
+                      serial: this.powerSettingSerial,
+                      power: turnOn,
+                  };
 
             const formData = new FormData();
             formData.append('data', JSON.stringify(data));

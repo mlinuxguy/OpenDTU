@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Copyright (C) 2022-2025 Thomas Basler and others
+ * Copyright (C) 2022-2026 Thomas Basler and others
  */
 #include "Hoymiles.h"
-#include "Utils.h"
+#include "HoymilesUtils.h"
 #include "inverters/HERF_1CH.h"
 #include "inverters/HERF_2CH.h"
 #include "inverters/HERF_4CH.h"
@@ -74,7 +74,7 @@ void HoymilesClass::loop()
                 iv->sendChangeChannelRequest();
             }
 
-            if (Utils::getTimeAvailable()) {
+            if (HoymilesUtils::getTimeAvailable()) {
                 // Fetch statistics
                 iv->sendStatsRequest();
 
@@ -110,6 +110,12 @@ void HoymilesClass::loop()
                         ESP_LOGI(TAG, "Request device info");
                         iv->sendDevInfoRequest();
                     }
+
+                    // Fetch RF module info (only required once)
+                    if (!iv->RfInfo()->containsValidData()) {
+                        ESP_LOGI(TAG, "Request RF info");
+                        iv->sendRfInfoRequest();
+                    }
                 }
             }
 
@@ -135,7 +141,7 @@ void HoymilesClass::loop()
     }
 
     // Perform housekeeping of all inverters on day change
-    const int8_t currentWeekDay = Utils::getWeekDay();
+    const int8_t currentWeekDay = HoymilesUtils::getWeekDay();
     static int8_t lastWeekDay = -1;
     if (lastWeekDay == -1) {
         lastWeekDay = currentWeekDay;

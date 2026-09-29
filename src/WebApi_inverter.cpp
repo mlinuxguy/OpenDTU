@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Copyright (C) 2022-2024 Thomas Basler and others
+ * Copyright (C) 2022-2026 Thomas Basler and others
  */
 #include "WebApi_inverter.h"
 #include "Configuration.h"
@@ -11,17 +11,18 @@
 #include "helper.h"
 #include <AsyncJson.h>
 #include <Hoymiles.h>
+#include <HoymilesUtils.h>
 
 void WebApiInverterClass::init(AsyncWebServer& server, Scheduler& scheduler)
 {
     using std::placeholders::_1;
 
-    server.on("/api/inverter/list", HTTP_GET, std::bind(&WebApiInverterClass::onInverterList, this, _1));
-    server.on("/api/inverter/add", HTTP_POST, std::bind(&WebApiInverterClass::onInverterAdd, this, _1));
-    server.on("/api/inverter/edit", HTTP_POST, std::bind(&WebApiInverterClass::onInverterEdit, this, _1));
-    server.on("/api/inverter/del", HTTP_POST, std::bind(&WebApiInverterClass::onInverterDelete, this, _1));
-    server.on("/api/inverter/order", HTTP_POST, std::bind(&WebApiInverterClass::onInverterOrder, this, _1));
-    server.on("/api/inverter/stats_reset", HTTP_GET, std::bind(&WebApiInverterClass::onInverterStatReset, this, _1));
+    server.on("/api/inverter/list", HTTP_GET, static_cast<ArRequestHandlerFunction>(std::bind(&WebApiInverterClass::onInverterList, this, _1)));
+    server.on("/api/inverter/add", HTTP_POST, static_cast<ArRequestHandlerFunction>(std::bind(&WebApiInverterClass::onInverterAdd, this, _1)));
+    server.on("/api/inverter/edit", HTTP_POST, static_cast<ArRequestHandlerFunction>(std::bind(&WebApiInverterClass::onInverterEdit, this, _1)));
+    server.on("/api/inverter/del", HTTP_POST, static_cast<ArRequestHandlerFunction>(std::bind(&WebApiInverterClass::onInverterDelete, this, _1)));
+    server.on("/api/inverter/order", HTTP_POST, static_cast<ArRequestHandlerFunction>(std::bind(&WebApiInverterClass::onInverterOrder, this, _1)));
+    server.on("/api/inverter/stats_reset", HTTP_GET, static_cast<ArRequestHandlerFunction>(std::bind(&WebApiInverterClass::onInverterStatReset, this, _1)));
 }
 
 void WebApiInverterClass::onInverterList(AsyncWebServerRequest* request)
@@ -44,11 +45,7 @@ void WebApiInverterClass::onInverterList(AsyncWebServerRequest* request)
             obj["order"] = config.Inverter[i].Order;
 
             // Inverter Serial is read as HEX
-            char buffer[sizeof(uint64_t) * 8 + 1];
-            snprintf(buffer, sizeof(buffer), "%0" PRIx32 "%08" PRIx32,
-                static_cast<uint32_t>((config.Inverter[i].Serial >> 32) & 0xFFFFFFFF),
-                static_cast<uint32_t>(config.Inverter[i].Serial & 0xFFFFFFFF));
-            obj["serial"] = buffer;
+            obj["serial"] = HoymilesUtils::formatSerial(config.Inverter[i].Serial);
             obj["poll_enable"] = config.Inverter[i].Poll_Enable;
             obj["poll_enable_night"] = config.Inverter[i].Poll_Enable_Night;
             obj["command_enable"] = config.Inverter[i].Command_Enable;
@@ -115,7 +112,7 @@ void WebApiInverterClass::onInverterAdd(AsyncWebServerRequest* request)
     }
 
     if (root["name"].as<String>().length() == 0 || root["name"].as<String>().length() > INV_MAX_NAME_STRLEN) {
-        retMsg["message"] = "Name must between 1 and " STR(INV_MAX_NAME_STRLEN) " characters long!";
+        retMsg["message"] = "Name must between 1 and " STR_EXTRACT(INV_MAX_NAME_STRLEN) " characters long!";
         retMsg["code"] = WebApiError::InverterNameLength;
         retMsg["param"]["max"] = INV_MAX_NAME_STRLEN;
         WebApi.sendJsonResponse(request, response, __FUNCTION__, __LINE__);
@@ -125,7 +122,7 @@ void WebApiInverterClass::onInverterAdd(AsyncWebServerRequest* request)
     INVERTER_CONFIG_T* inverter = Configuration.getFreeInverterSlot();
 
     if (!inverter) {
-        retMsg["message"] = "Only " STR(INV_MAX_COUNT) " inverters are supported!";
+        retMsg["message"] = "Only " STR_EXTRACT(INV_MAX_COUNT) " inverters are supported!";
         retMsg["code"] = WebApiError::InverterCount;
         retMsg["param"]["max"] = INV_MAX_COUNT;
         WebApi.sendJsonResponse(request, response, __FUNCTION__, __LINE__);
@@ -194,7 +191,7 @@ void WebApiInverterClass::onInverterEdit(AsyncWebServerRequest* request)
     }
 
     if (root["name"].as<String>().length() == 0 || root["name"].as<String>().length() > INV_MAX_NAME_STRLEN) {
-        retMsg["message"] = "Name must between 1 and " STR(INV_MAX_NAME_STRLEN) " characters long!";
+        retMsg["message"] = "Name must between 1 and " STR_EXTRACT(INV_MAX_NAME_STRLEN) " characters long!";
         retMsg["code"] = WebApiError::InverterNameLength;
         retMsg["param"]["max"] = INV_MAX_NAME_STRLEN;
         WebApi.sendJsonResponse(request, response, __FUNCTION__, __LINE__);

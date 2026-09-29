@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Copyright (C) 2022-2025 Thomas Basler and others
+ * Copyright (C) 2022-2026 Thomas Basler and others
  */
 #include "MqttHandleInverter.h"
 #include "MqttSettings.h"
@@ -69,6 +69,14 @@ void MqttHandleInverterClass::loop()
 
             // Hardware version
             MqttSettings.publish(subtopic + "/device/hwversion", inv->DevInfo()->getHwVersion());
+        }
+
+        if (inv->RfInfo()->containsValidData()) {
+            // RF module hardware version
+            MqttSettings.publish(subtopic + "/device/rf_hwversion", inv->RfInfo()->getRfHardwareVersionStr());
+
+            // RF module firmware version
+            MqttSettings.publish(subtopic + "/device/rf_fwversion", inv->RfInfo()->getRfFirmwareVersionStr());
         }
 
         if (inv->SystemConfigPara()->getLastUpdate() > 0) {

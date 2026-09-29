@@ -189,6 +189,8 @@
         "HardwarePartNumber": "Hardware Part Number",
         "HardwareVersion": "Hardware Version",
         "SupportsPowerDistributionLogic": "'Power Distribution Logic' supported",
+        "RfHardwareVersion": "RF Module Hardware Version",
+        "RfFirmwareVersion": "RF Module Firmware Version",
         "Yes": "@:base.Yes",
         "No": "@:base.No"
     },
@@ -215,6 +217,7 @@
         "ConfigVersion": "Config Version",
         "FirmwareVersion": "Firmware Version / Git Hash",
         "FirmwareBranch": "Firmware Branch",
+        "CompileDateTime": "Compile Date/Time (UTC)",
         "PioEnv": "PIO Environment",
         "FirmwareVersionHint": "Click here to show information about your current version",
         "FirmwareUpdate": "Firmware Update",
@@ -248,8 +251,9 @@
         "LittleFs": "LittleFs",
         "Sketch": "Sketch"
     },
-    "heapdetails": {
+    "memorydetails": {
         "HeapDetails": "Heap Details",
+        "PsramDetails": "PSRAM Details",
         "TotalFree": "Total free",
         "LargestFreeBlock": "Biggest contiguous free block",
         "MaxUsage": "Maximum usage since start",
@@ -260,6 +264,7 @@
         "Name": "Name",
         "StackFree": "Stack Free",
         "Priority": "Priority",
+        "Core": "Core",
         "Task_idle0": "Idle (CPU Core 0)",
         "Task_idle1": "Idle (CPU Core 1)",
         "Task_wifi": "Wi-Fi",
@@ -382,6 +387,7 @@
     },
     "inverterchannelproperty": {
         "Power": "Power",
+        "MaxDailyPower": "Max Power",
         "Voltage": "Voltage",
         "Current": "Current",
         "Power DC": "Power DC",
@@ -389,6 +395,7 @@
         "YieldTotal": "YieldTotal",
         "Frequency": "Frequency",
         "Temperature": "Temperature",
+        "MaxTemperature": "Max Temperature",
         "PowerFactor": "PowerFactor",
         "ReactivePower": "ReactivePower",
         "Efficiency": "Efficiency",
@@ -635,7 +642,7 @@
         "ErrorReporting": "Error Reporting",
         "ErrorReportingBody": "Please report issues using the feature provided by <a href=\"https://github.com/tbnobody/OpenDTU/issues\" target=\"_blank\">Github</a>",
         "Discussion": "Discussion",
-        "DiscussionBody": "Discuss with us on <a href=\"https://discord.gg/46hWaXsn\" target=\"_blank\">Discord</a> or <a href=\"https://github.com/tbnobody/OpenDTU/discussions\" target=\"_blank\">Github</a>"
+        "DiscussionBody": "Discuss with us on <a href=\"https://discord.gg/CmhuZwWZM2\" target=\"_blank\">Discord</a> or <a href=\"https://github.com/tbnobody/OpenDTU/discussions\" target=\"_blank\">Github</a>"
     },
     "hints": {
         "RadioProblem": "Could not connect to a configured radio module. Please check the wiring.",
@@ -679,9 +686,7 @@
         "LedBrightness": "LED {led} brightness ({brightness})"
     },
     "pininfo": {
-        "Category": "Category",
         "Name": "Name",
-        "Number": "Number",
         "ValueSelected": "Selected",
         "ValueActive": "Active"
     },
@@ -702,6 +707,8 @@
         "Module_mqtt": "MQTT Client",
         "Module_network": "Network",
         "Module_webapi": "Web API",
+        "Module_async_ws": "Async WebSockets",
+        "Module_async_tcp": "Async TCP",
         "CoreHint": "Warning: A too detailed log level of the ESP-IDF Core module can significantly impact performance and lead to unpredictable behavior. The log level setting should only be temporarily adjusted for targeted troubleshooting. The default setting 'Error' is sufficient for normal operation.",
         "log_inherit": "Inherit from default",
         "log_none": "None",

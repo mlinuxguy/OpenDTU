@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Copyright (C) 2022-2024 Thomas Basler and others
+ * Copyright (C) 2022-2026 Thomas Basler and others
  */
 #include "WebApi_dtu.h"
 #include "Configuration.h"
@@ -8,6 +8,7 @@
 #include "WebApi_errors.h"
 #include <AsyncJson.h>
 #include <Hoymiles.h>
+#include <HoymilesUtils.h>
 
 WebApiDtuClass::WebApiDtuClass()
     : _applyDataTask(TASK_IMMEDIATE, TASK_ONCE, std::bind(&WebApiDtuClass::applyDataTaskCb, this))
@@ -22,6 +23,8 @@ void WebApiDtuClass::init(AsyncWebServer& server, Scheduler& scheduler)
     server.on("/api/dtu/config", HTTP_POST, std::bind(&WebApiDtuClass::onDtuAdminPost, this, _1));
     server.on("/api/dtu/capture", HTTP_GET, std::bind(&WebApiDtuClass::onCaptureGet, this, _1));
     server.on("/api/dtu/capture", HTTP_POST, std::bind(&WebApiDtuClass::onCapturePost, this, _1));
+    server.on("/api/dtu/config", HTTP_GET, static_cast<ArRequestHandlerFunction>(std::bind(&WebApiDtuClass::onDtuAdminGet, this, _1)));
+    server.on("/api/dtu/config", HTTP_POST, static_cast<ArRequestHandlerFunction>(std::bind(&WebApiDtuClass::onDtuAdminPost, this, _1)));
 
     scheduler.addTask(_applyDataTask);
 }
@@ -31,11 +34,13 @@ void WebApiDtuClass::applyDataTaskCb()
     // Execute stuff in main thread to avoid busy SPI bus
     auto const& config = Configuration.get();
     Hoymiles.getRadioNrf()->setPALevel((rf24_pa_dbm_e)config.Dtu.Nrf.PaLevel);
-    Hoymiles.getRadioCmt()->setPALevel(config.Dtu.Cmt.PaLevel);
     Hoymiles.getRadioNrf()->setDtuSerial(config.Dtu.Serial);
     Hoymiles.getRadioCmt()->setDtuSerial(config.Dtu.Serial);
+    // setCountryMode() re-initializes the CMT chip, so frequency and PA level
+    // have to be applied afterwards
     Hoymiles.getRadioCmt()->setCountryMode(static_cast<CountryModeId_t>(config.Dtu.Cmt.CountryMode));
     Hoymiles.getRadioCmt()->setInverterTargetFrequency(config.Dtu.Cmt.Frequency);
+    Hoymiles.getRadioCmt()->setPALevel(config.Dtu.Cmt.PaLevel);
     Hoymiles.setPollInterval(config.Dtu.PollInterval);
 }
 
@@ -50,11 +55,7 @@ void WebApiDtuClass::onDtuAdminGet(AsyncWebServerRequest* request)
     const CONFIG_T& config = Configuration.get();
 
     // DTU Serial is read as HEX
-    char buffer[sizeof(uint64_t) * 8 + 1];
-    snprintf(buffer, sizeof(buffer), "%0" PRIx32 "%08" PRIx32,
-        static_cast<uint32_t>((config.Dtu.Serial >> 32) & 0xFFFFFFFF),
-        static_cast<uint32_t>(config.Dtu.Serial & 0xFFFFFFFF));
-    root["serial"] = buffer;
+    root["serial"] = HoymilesUtils::formatSerial(config.Dtu.Serial);
     root["pollinterval"] = config.Dtu.PollInterval;
     root["nrf_enabled"] = Hoymiles.getRadioNrf()->isInitialized();
     root["nrf_palevel"] = config.Dtu.Nrf.PaLevel;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Copyright (C) 2022-2025 Thomas Basler and others
+ * Copyright (C) 2022-2026 Thomas Basler and others
  */
 #include "Configuration.h"
 #include "NetworkSettings.h"
@@ -19,6 +19,7 @@ CONFIG_T config;
 static std::condition_variable sWriterCv;
 static std::mutex sWriterMutex;
 static unsigned sWriterCount = 0;
+static bool sWriterActive = false;
 
 void ConfigurationClass::init(Scheduler& scheduler)
 {
@@ -66,7 +67,6 @@ bool ConfigurationClass::write()
 
     JsonObject ntp = doc["ntp"].to<JsonObject>();
     ntp["server"] = config.Ntp.Server;
-    ntp["timezone"] = config.Ntp.Timezone;
     ntp["timezone_descr"] = config.Ntp.TimezoneDescr;
     ntp["latitude"] = config.Ntp.Latitude;
     ntp["longitude"] = config.Ntp.Longitude;
@@ -256,7 +256,6 @@ bool ConfigurationClass::read()
 
     JsonObject ntp = doc["ntp"];
     strlcpy(config.Ntp.Server, ntp["server"] | NTP_SERVER, sizeof(config.Ntp.Server));
-    strlcpy(config.Ntp.Timezone, ntp["timezone"] | NTP_TIMEZONE, sizeof(config.Ntp.Timezone));
     strlcpy(config.Ntp.TimezoneDescr, ntp["timezone_descr"] | NTP_TIMEZONEDESCR, sizeof(config.Ntp.TimezoneDescr));
     config.Ntp.Latitude = ntp["latitude"] | NTP_LATITUDE;
     config.Ntp.Longitude = ntp["longitude"] | NTP_LONGITUDE;
@@ -540,8 +539,14 @@ void ConfigurationClass::loop()
         return;
     }
 
+    // close the write guard for new writers, inform all existing writers and wait for them to finish
+    sWriterActive = true;
     sWriterCv.notify_all();
     sWriterCv.wait(lock, [] { return sWriterCount == 0; });
+
+    // open the write guard for new writers and inform all waiting writers that they can continue
+    sWriterActive = false;
+    sWriterCv.notify_all();
 }
 
 CONFIG_T& ConfigurationClass::WriteGuard::getConfig()
@@ -552,8 +557,14 @@ CONFIG_T& ConfigurationClass::WriteGuard::getConfig()
 ConfigurationClass::WriteGuard::WriteGuard()
     : _lock(sWriterMutex)
 {
+    // if writers are currently processed, we must wait for them to finish before we can add ourselves to the writer count
+    if (sWriterActive) {
+        sWriterCv.wait(_lock, [] { return !sWriterActive; });
+    }
+
+    // add ourselves to the writer count and wait to be processed
     sWriterCount++;
-    sWriterCv.wait(_lock);
+    sWriterCv.wait(_lock, [] { return sWriterActive; });
 }
 
 ConfigurationClass::WriteGuard::~WriteGuard()

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Copyright (C) 2022-2025 Thomas Basler and others
+ * Copyright (C) 2022-2026 Thomas Basler and others
  */
 #include "WebApi.h"
 #include "Configuration.h"
@@ -128,6 +128,20 @@ uint64_t WebApiClass::parseSerialFromRequest(AsyncWebServerRequest* request, Str
     }
 
     return 0;
+}
+
+String WebApiClass::formatCommandStatus(const LastCommandSuccess status)
+{
+    if (status == LastCommandSuccess::CMD_OK) {
+        return "Ok";
+    }
+    if (status == LastCommandSuccess::CMD_NOK) {
+        return "Failure";
+    }
+    if (status == LastCommandSuccess::CMD_PENDING) {
+        return "Pending";
+    }
+    return "Unknown";
 }
 
 bool WebApiClass::sendJsonResponse(AsyncWebServerRequest* request, AsyncJsonResponse* response, const char* function, const uint16_t line)

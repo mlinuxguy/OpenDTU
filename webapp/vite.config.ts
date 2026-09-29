@@ -36,7 +36,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
-      '~bootstrap': path.resolve(__dirname, 'node_modules/bootstrap'),
+      '~bootstrap': path.resolve(import.meta.dirname, 'node_modules/bootstrap'),
     }
   },
   build: {
@@ -58,7 +58,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // Only create one js file
-        inlineDynamicImports: true,
+        codeSplitting: false,
         // Get rid of hash on js file
         entryFileNames: 'js/app.js',
         // Get rid of hash on css file
@@ -73,6 +73,7 @@ export default defineConfig({
         // Required to make bootstrap compile without errors
         silenceDeprecations: [
           'import',
+          'if-function',
           'color-functions',
           'global-builtin',
         ],
