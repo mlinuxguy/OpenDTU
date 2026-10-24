@@ -81,7 +81,11 @@ void HoymilesRadio_NRF::loop()
                 ESP_LOGD(TAG, "RX Channel: %" PRIu8 " --> %s | %" PRId8 " dBm",
                     f.channel, HoymilesUtils::dumpArray(f.fragment, f.len).c_str(), f.rssi);
 
-                inv->addRxFragment(f.fragment, f.len, f.rssi);
+                const auto command = _commandQueue.tryFront();
+                const bool ownsTransaction = _busyFlag && command.has_value()
+                    && command.value()->getTargetAddress() == inv->serial();
+                const uint8_t expectedMainCmd = ownsTransaction ? (command.value()->getMainCmd() | 0x80) : 0;
+                inv->addRxFragment(f.fragment, f.len, f.rssi, expectedMainCmd);
             } else {
                 ESP_LOGE(TAG, "Inverter Not found!");
             }
